@@ -1,0 +1,2 @@
+# PacMan
+* Controller support (XInput)

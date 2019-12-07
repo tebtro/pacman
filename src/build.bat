@@ -41,7 +41,7 @@ set ExecutableName=pacman
 
 :: 64-bit build
 echo WAITING FOR PDB > lock.tmp
-cl %CommonCompilerFlags% %CompileTimeDefines% ..\src\pacman.cpp -Fmpacman.map -LD /link -DLL -OUT:pacman.dll -PDB:pacman.pdb %AdditionalLinkerFlags% -EXPORT:game_update_and_render
+cl %CommonCompilerFlags% %CompileTimeDefines% ..\src\pacman.cpp -Fmpacman.map -LD /link -DLL -OUT:pacman.dll -PDB:pacman_%random%.pdb %AdditionalLinkerFlags% -EXPORT:game_update_and_render
 
 set LastError=%ERRORLEVEL%
 del lock.tmp

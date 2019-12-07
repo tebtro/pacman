@@ -39,12 +39,52 @@ _push_size_(Memory_Arena *arena, memory_index size) {
 // @note: game related
 //
 
+enum Tile_Type : u32 {
+    ZERO = 0,
+    WALL = 1,
+    
+    WALKABLE = 2,
+    COIN = 3,
+    POWER_COIN = 4,
+    
+    PLAYER = 5,
+    PlAYER_START_POS = 6,
+    
+    GHOST = 7,
+};
+
+enum Direction : u32 {
+    UP = 1,
+    RIGHT = 2,
+    DOWN = 3,
+    LEFT = 4
+};
+
+struct Game {
+    u32 *grid;
+    u32 grid_width;
+    u32 grid_height;
+    
+    u32 pacman_pos_x;
+    u32 pacman_pos_y;
+    // f32 pacman_visual_pos;
+    
+    enum32(Direction) pacman_move_direction;
+    enum32(Direction) pacman_next_input_direction;
+};
+
 struct Game_State {
     Memory_Arena game_arena;
+    Game *game;
+    
+    int tile_size;
+    f32 offset_x;
+    f32 offset_y;
+    
+    f32 move_update_frequency_ms = 500.0f;
+    f32 dt_since_last_move_update = 0.0f;
     
     u32 active_controller_index;
-    u32 offset_x;
-    u32 offset_y;
 };
 
 #define PACMAN_H

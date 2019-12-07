@@ -1,6 +1,11 @@
 // @todo improve input system
 
 
+#include "iml_general.h"
+#include "pacman_platform.h"
+#include "iml_types.h"
+
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <mmsystem.h> // @note excluded in lean and mean, used for timeBeginPeriod to set scheduler granularity
@@ -9,113 +14,52 @@
 
 #include <stdio.h>
 
-#include "iml_general.h"
-#include "iml_types.h"
+#include "win32_pacman.h"
 
 
 #define WIDTH  800
 #define HEIGHT 600
 
 
-struct Win32_Offscreen_Buffer {
-    BITMAPINFO info;
-    void *memory;
-    int width;
-    int height;
-    int pitch;
-    int bytes_per_pixel;
-};
-
-struct Win32_Window_Dimension {
-    int width;
-    int height;
-};
-
-struct Vector2 {
-    int x;
-    int y;
-};
-typedef Vector2 v2;
-
-struct Vector3 {
-    union {
-        struct {
-            u32 x;
-            u32 y;
-            u32 z;
-        };
-        struct {
-            u32 r;
-            u32 g;
-            u32 b;
-        };
-    };
-};
-typedef Vector3 v3;
-
-internal Vector3
-rgb(u32 r, u32 g, u32 b) {
-    Vector3 rgb { r, g, b };
-    return rgb;
-}
-
-struct Game_State {
-};
-
-struct Game_Button_State {
-    b32 ended_down;
-    b32 allow_press;
-    int half_transition_count;
-};
-
-struct Game_Controller_Input {
-    b32 is_connected;
-    b32 is_analog;
-    f32 stick_average_x;
-    f32 stick_average_y;
-    
-    union {
-        Game_Button_State buttons[12];
-        
-        struct {
-            Game_Button_State move_up;
-            Game_Button_State move_down;
-            Game_Button_State move_left;
-            Game_Button_State move_right;
-            
-            Game_Button_State action_up;
-            Game_Button_State action_down;
-            Game_Button_State action_left;
-            Game_Button_State action_right;
-            
-            Game_Button_State left_shoulder;
-            Game_Button_State right_shoulder;
-            
-            Game_Button_State start;
-            Game_Button_State back;
-            
-            // @note all buttons must be added to the struct above this line!!!
-            Game_Button_State _terminator_;
-        };
-    };
-};
-
-struct Game_Input {
-    Game_Controller_Input controllers[5];
-};
-
-inline Game_Controller_Input *
-get_controller(Game_Input *input, u32 controller_index) {
-    assert(controller_index < array_count(input->controllers));
-    return &input->controllers[controller_index];
-}
-
-
-global Win32_Offscreen_Buffer global_backbuffer;
 global b32 global_running;
+#if BUILD_INTERNAL
+global b32 global_pause;
+#endif
+global Win32_Offscreen_Buffer global_backbuffer;
 global s64 global_performance_count_frequency;
 global WINDOWPLACEMENT global_window_position = { sizeof(global_window_position) };
 
+
+internal int
+string_length(char *str) {
+    int length = 0;
+    while (*str++) {
+        ++length;
+    }
+    return length;
+}
+
+internal void
+concat_strings(char *source_a, size_t source_a_length,
+               char *source_b, size_t source_b_length,
+               char *output,   size_t output_length) {
+    // @todo output bounds checking!
+    for (int i = 0; i < source_a_length; ++i) {
+        *output++ = *source_a++;
+    }
+    for (int i = 0; i < source_b_length; ++i) {
+        *output++ = *source_b++;
+    }
+    *output++ = '\0';
+}
+
+internal void
+win32_build_exe_path_filename(Win32_State *state, char *filename,
+                              char *output, int output_length) {
+    concat_strings(state->exe_filename, state->exe_filename_one_past_last_slash - state->exe_filename,
+                   filename, string_length(filename),
+                   output, output_length);
+}
 
 // @note xinput_get_state
 #define XINPUT_GET_STATE_SIG(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
@@ -156,6 +100,34 @@ win32_load_xinput() {
     if (!xinput_set_state)  {
         xinput_set_state = xinput_set_state_stub;
     }
+}
+
+internal Win32_Game_Code
+win32_load_game_code(char *source_dll_name) {
+    Win32_Game_Code game = {};
+    
+    game.game_code_dll = LoadLibraryA(source_dll_name);
+    if (game.game_code_dll) {
+        game.update_and_render = (Game_Update_And_Render_Function *)GetProcAddress(game.game_code_dll, "game_update_and_render");
+        
+        game.is_valid = (game.update_and_render != nullptr);
+    }
+    
+    if (!game.is_valid) {
+        game.update_and_render = null;
+    }
+    
+    return game;
+}
+
+internal void
+win32_unload_game_code(Win32_Game_Code *game) {
+    if (game->game_code_dll) {
+        FreeLibrary(game->game_code_dll);
+        game->game_code_dll = null;
+    }
+    game->is_valid = false;
+    game->update_and_render = null;
 }
 
 internal void
@@ -201,7 +173,7 @@ win32_display_buffer_in_window(Win32_Offscreen_Buffer *buffer, HDC device_contex
     int buffer_height = HEIGHT;
     
     f32 height_scale = (f32)window_height / (f32)buffer_height;
-    int new_width = (f32)buffer_width * height_scale;
+    int new_width = (int)((f32)buffer_width * height_scale);
     int offset_x = (window_width - new_width) / 2;
     if (new_width <= buffer_width)  {
         offset_x = 0;
@@ -292,19 +264,6 @@ win32_main_window_callback(HWND window,
 }
 
 internal void
-win32_clear_buffer(Win32_Offscreen_Buffer *buffer, Game_State *game_state) {
-    u8 *row = (u8 *)buffer->memory;
-    for (int y = 0; y < buffer->height; ++y) {
-        u32 *pixel = (u32 *)row;
-        for (int x = 0; x < buffer->width; ++x) {
-            *pixel++ = 0;
-        }
-        
-        row += buffer->pitch;
-    }
-}
-
-internal void
 win32_process_keyboard_message(Game_Button_State *new_state, b32 is_down) {
     if (new_state->ended_down == is_down)  return;
     new_state->ended_down = is_down;
@@ -391,19 +350,25 @@ win32_process_pending_messages(Game_Controller_Input *keyboard_controller) {
                         global_running = false;
                     }
                     
+#if BUILD_INTERNAL
+                    else if (vk_code == 'P') {
+                        if (is_down) {
+                            global_pause = !global_pause;
+                        }
+                    }
+                    
                     if (is_down) {
                         b32 alt_key_was_down = (message.lParam & (1 << 29));
-                        if (alt_key_was_down)  {
-                            if (vk_code == VK_F4) {
-                                global_running = false;
-                            }
-                            if (vk_code == VK_RETURN)  {
-                                if (message.hwnd) {
-                                    toggle_fullscreen(message.hwnd);
-                                }
+                        if ((vk_code == VK_F4) && alt_key_was_down) {
+                            global_running = false;
+                        }
+                        if ((vk_code == VK_RETURN) && alt_key_was_down)  {
+                            if (message.hwnd)  {
+                                toggle_fullscreen(message.hwnd);
                             }
                         }
                     }
+#endif
                 }
             } break;
             
@@ -428,11 +393,29 @@ win32_get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
     return result;
 }
 
+internal void
+win32_get_exe_filename(Win32_State *state) {
+    DWORD size_of_filename = GetModuleFileNameA(0, state->exe_filename, sizeof(state->exe_filename));
+    state->exe_filename_one_past_last_slash = state->exe_filename;
+    for (char *scan = state->exe_filename; *scan; ++scan) {
+        if (*scan == '\\') {
+            state->exe_filename_one_past_last_slash = scan + 1;
+        }
+    }
+}
+
 int CALLBACK
 WinMain(HINSTANCE instance,
         HINSTANCE prev_instance,
         LPSTR     cmd_line,
         int       show_cmd) {
+    Win32_State win32_state = {};
+    win32_get_exe_filename(&win32_state);
+    
+    char source_game_dll_full_path[WIN32_STATE_FILENAME_LENGTH];
+    win32_build_exe_path_filename(&win32_state, "pacman.dll",
+                                  source_game_dll_full_path, sizeof(source_game_dll_full_path));
+    
     LARGE_INTEGER performance_count_frequency_result;
     QueryPerformanceFrequency(&performance_count_frequency_result);
     global_performance_count_frequency = performance_count_frequency_result.QuadPart;
@@ -448,13 +431,13 @@ WinMain(HINSTANCE instance,
     window_class.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
     window_class.lpfnWndProc = win32_main_window_callback;
     window_class.hInstance = instance;
-    window_class.lpszClassName = "TetrisWindowClass";
+    window_class.lpszClassName = "PacmanWindowClass";
     
     if (!RegisterClassA(&window_class))  {
         // @todo
     }
     HWND window = CreateWindowExA(0, window_class.lpszClassName,
-                                  "Tetris",
+                                  "Pacman",
                                   WS_OVERLAPPEDWINDOW|WS_VISIBLE,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
                                   WIDTH, HEIGHT,
@@ -463,10 +446,10 @@ WinMain(HINSTANCE instance,
         // @todo
     }
     
-    HDC device_context = GetDC(window);
-    
     int monitor_refresh_hz = 60;
-    int win32_refresh_rate = GetDeviceCaps(device_context, VREFRESH);
+    HDC refresh_dc = GetDC(window);
+    int win32_refresh_rate = GetDeviceCaps(refresh_dc, VREFRESH);
+    ReleaseDC(window, refresh_dc);
     if (win32_refresh_rate > 1)  {
         monitor_refresh_hz = win32_refresh_rate;
     }
@@ -474,20 +457,34 @@ WinMain(HINSTANCE instance,
     f32 target_seconds_per_frame =  1.0f / (f32)game_update_hz;
     f32 dt = target_seconds_per_frame;
     
-    f32 move_update_frequency_ms = 200.0f;
-    LARGE_INTEGER last_move_counter = win32_get_wall_clock();
     
-    LARGE_INTEGER perf_count_frequency_result;
-    QueryPerformanceFrequency(&perf_count_frequency_result);
-    s64 perf_count_frequency = perf_count_frequency_result.QuadPart;
+    // @note game memory
+#if BUILD_INTERNAL
+    LPVOID base_address = (LPVOID)terabytes_to_bytes(2);
+#else
+    LPVOID base_address = 0;
+#endif
+    Game_Memory game_memory = {};
+    game_memory.permanent_storage_size = megabytes_to_bytes(64);
+    
+    win32_state.game_memory_total_size = game_memory.permanent_storage_size;
+    win32_state.game_memory_block = VirtualAlloc(base_address, (size_t)win32_state.game_memory_total_size,
+                                                 MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    game_memory.permanent_storage = win32_state.game_memory_block;
+    
+    if (!game_memory.permanent_storage) {
+        return -1;
+    }
+    
     
     Game_Input input[2] = {};
     Game_Input *new_input = &input[0];
     Game_Input *old_input = &input[1];
     
-    int active_controller_index = 0;
-    
-    Game_State game_state = {};
+    Win32_Game_Code game = win32_load_game_code(source_game_dll_full_path);
+    if (!game.is_valid) {
+        return -1;
+    }
     
     global_running = true;
     
@@ -495,6 +492,8 @@ WinMain(HINSTANCE instance,
     QueryPerformanceCounter(&last_counter);
     u64 last_cycle_count = __rdtsc();
     while (global_running) {
+        new_input->dt = target_seconds_per_frame;
+        
         //
         // @note handle input
         //
@@ -503,14 +502,15 @@ WinMain(HINSTANCE instance,
         Game_Controller_Input *new_keyboard_controller = get_controller(new_input, 0);
         *new_keyboard_controller = {};
         new_keyboard_controller->is_connected = true;
-        
-#if 0
         for (int button_index = 0; button_index < array_count(new_keyboard_controller->buttons); ++button_index) {
             new_keyboard_controller->buttons[button_index].ended_down = old_keyboard_controller->buttons[button_index].ended_down;
         }
-#endif
         
         win32_process_pending_messages(new_keyboard_controller);
+        
+        if (global_pause) {
+        	continue;
+        }
         
         DWORD max_controller_count = XUSER_MAX_COUNT;
         DWORD input_controller_count = array_count(input->controllers) - 1;
@@ -614,46 +614,17 @@ WinMain(HINSTANCE instance,
         }
         
         //
-        // @note do input
+        // @note game_update_and_render
         //
+        Game_Offscreen_Buffer buffer = {};
+        buffer.memory = global_backbuffer.memory;
+        buffer.width  = global_backbuffer.width;
+        buffer.height = global_backbuffer.height;
+        buffer.pitch  = global_backbuffer.pitch;
+        buffer.bytes_per_pixel  = global_backbuffer.bytes_per_pixel;
         
-        for (DWORD controller_index = 0; controller_index < input_controller_count; ++controller_index) {
-            Game_Controller_Input *controller = get_controller(old_input, controller_index);
-            if (controller->start.ended_down)  {
-                active_controller_index = controller_index;
-            }
-        }
+        if (game.update_and_render)  game.update_and_render(&game_memory, new_input, &buffer);
         
-        {
-            Game_Controller_Input *controller = get_controller(new_input, active_controller_index);
-            
-            if (controller->move_up.ended_down) {
-            }
-            else if (controller->move_left.ended_down) {
-            }
-            else if (controller->move_down.ended_down) {
-            }
-            else if (controller->move_right.ended_down) {
-            }
-            else if (controller->action_right.ended_down || controller->action_down.ended_down) {
-            }
-        }
-        
-        //
-        // @note simulate
-        //
-        
-        
-        
-        //
-        // @note render
-        //
-        win32_clear_buffer(&global_backbuffer, &game_state);
-        
-        
-        
-        Win32_Window_Dimension dimension = win32_get_window_dimension(window);
-        win32_display_buffer_in_window(&global_backbuffer, device_context, dimension.width, dimension.height);
         
         //
         // @note frame rate
@@ -664,16 +635,16 @@ WinMain(HINSTANCE instance,
         f32 seconds_elapsed_for_frame = seconds_elapsed_for_work;
         if (seconds_elapsed_for_frame < target_seconds_per_frame) {
             DWORD sleep_ms;
-            if (sleep_is_granular)  {
+            if (sleep_is_granular) {
                 sleep_ms = (DWORD)(1000 * (DWORD)(target_seconds_per_frame - seconds_elapsed_for_frame));
-                if (sleep_ms > 0)  {
+                if (sleep_ms > 0) {
                     Sleep(sleep_ms);
                 }
             }
             
             f32 test_seconds_elapsed_for_frame = win32_get_seconds_elapsed(last_counter, win32_get_wall_clock());
-            if (test_seconds_elapsed_for_frame > target_seconds_per_frame)  {
-                // @todo missed sleep here
+            if (test_seconds_elapsed_for_frame > target_seconds_per_frame) {
+                // @todo LOG MISSED SLEEP HERE
             }
             
             while (seconds_elapsed_for_frame < target_seconds_per_frame) {
@@ -681,12 +652,24 @@ WinMain(HINSTANCE instance,
             }
         }
         else {
-            // @todo missed frame rate!
+            // @todo MISSED FRAME RATE!
+            // @todo logging
         }
         
         LARGE_INTEGER end_counter = win32_get_wall_clock();
         f64 ms_per_frame = 1000.0f * win32_get_seconds_elapsed(last_counter, end_counter);
         last_counter = end_counter;
+        
+        //
+        // @note display buffer
+        //
+        
+        Win32_Window_Dimension dimension = win32_get_window_dimension(window);
+        HDC device_context = GetDC(window);
+        win32_display_buffer_in_window(&global_backbuffer, device_context,
+                                       dimension.width, dimension.height);
+        ReleaseDC(window, device_context);
+        
         
         Game_Input *temp_input = new_input;
         new_input = old_input;

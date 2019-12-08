@@ -60,17 +60,44 @@ enum Direction : u32 {
     LEFT = 4
 };
 
-struct Game {
-    u32 *grid;
-    u32 grid_width;
-    u32 grid_height;
+struct Entity {
+    b32 is_active;
     
-    u32 pacman_pos_x;
-    u32 pacman_pos_y;
+    int pos_x;
+    int pos_y;
     // f32 pacman_visual_pos;
     
-    enum32(Direction) pacman_move_direction;
-    enum32(Direction) pacman_next_input_direction;
+    enum32(Direction) move_direction;
+    enum32(Direction) next_input_direction;
+    
+    f32 move_update_frequency_ms = 400.0f;
+    f32 dt_since_last_move_update = 0.0f;
+    
+    struct Color {
+        f32 r, g, b;
+    } color;
+};
+
+struct Game {
+    u32 *grid;
+    int grid_width;
+    int grid_height;
+    
+    union {
+        struct {
+            Entity pacman;
+            Entity ghost1;
+            Entity ghost2;
+            Entity ghost3;
+            Entity ghost4;
+        };
+        Entity entities[5];
+    };
+    
+    int pacman_lifes = 3;
+    
+    f32 ghost_activation_frequency_ms = 10000.0f;
+    f32 dt_since_last_ghost_activation = 0.0f;
 };
 
 struct Game_State {
@@ -80,9 +107,6 @@ struct Game_State {
     int tile_size;
     f32 offset_x;
     f32 offset_y;
-    
-    f32 move_update_frequency_ms = 500.0f;
-    f32 dt_since_last_move_update = 0.0f;
     
     u32 active_controller_index;
 };

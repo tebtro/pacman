@@ -1,10 +1,23 @@
+// @todo ghost should collide with other ghosts
+
 #include "pacman.h"
 #include "pacman_math.h"
 #include "pacman_intrinsics.h"
 
 
+#include <stdlib.h>
+#include <time.h>
+
+internal u32
+get_random_number_in_range(int min, int max) {
+    srand((unsigned int)time(null));
+    u32 random = min + (rand() % ((max + 1) - min));
+    return random;
+}
+
 internal b32
-is_tile_walkable(Game *game, u32 pos_x, u32 pos_y) {
+is_tile_walkable(Game *game, int pos_x, int pos_y) {
+    if (pos_x < 0 || pos_y < 0)  return false;
     b32 is_walkable = false;
     
     u32 tile_value = game->grid[pos_y*game->grid_width + pos_x];
@@ -16,11 +29,13 @@ is_tile_walkable(Game *game, u32 pos_x, u32 pos_y) {
 }
 
 internal b32
-move_if_walkable(Game *game, u32 old_pos_x, u32 old_pos_y, enum32(Direction) dir) {
+move_if_walkable(Game *game, Entity *entity, enum32(Direction) dir) {
     if (dir == 0)  return false;
     
-    u32 new_pos_x = old_pos_x;
-    u32 new_pos_y = old_pos_y;
+    int old_pos_x = entity->pos_x;
+    int old_pos_y = entity->pos_y;
+    int new_pos_x = old_pos_x;
+    int new_pos_y = old_pos_y;
     
     if (dir == UP) {
         --new_pos_y;
@@ -35,10 +50,15 @@ move_if_walkable(Game *game, u32 old_pos_x, u32 old_pos_y, enum32(Direction) dir
         ++new_pos_x;
     }
     
+    if (new_pos_x < 0)  new_pos_x = game->grid_width - 1;
+    if (new_pos_y < 0)  new_pos_y = game->grid_height - 1;
+    if (new_pos_x >= game->grid_width)  new_pos_x = 0;
+    if (new_pos_y >= game->grid_height) new_pos_y = 0;
+    
     b32 is_walkable = is_tile_walkable(game, new_pos_x, new_pos_y);
     if (is_walkable) {
-        game->pacman_pos_x = new_pos_x;
-        game->pacman_pos_y = new_pos_y;
+        entity->pos_x = new_pos_x;
+        entity->pos_y = new_pos_y;
     }
     
     return is_walkable;
@@ -105,14 +125,86 @@ render_tile(Game_Offscreen_Buffer *buffer, Game_State *game_state,
 internal void
 render_grid(Game_Offscreen_Buffer *buffer, Game_State *game_state) {
     Game *game = game_state->game;
-    for (u32 y = 0; y < game->grid_height; ++y) {
-        for (u32 x = 0; x < game->grid_width; ++x) {
+    for (int  y = 0; y < game->grid_height; ++y) {
+        for (int x = 0; x < game->grid_width; ++x) {
             int tile_value = game->grid[y*game->grid_width + x];
             if (tile_value == 1) {
                 render_tile(buffer, game_state, x, y, 0.0f, 0.0f, 1.0f);
             }
         }
     }
+}
+
+internal void
+reset_game(Game *game) {
+    u32 _grid[27][21] = {
+        // 0=nothing, 1=wall, 2=walkable, 3=coin, 4=power_coin, 5=player, 6=ghost1, 7=player_start ... ???
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1},
+        {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
+        {1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1},
+        {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
+        {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
+        {1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,2,1},
+        {1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,2,1},
+        {1,2,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,2,1},
+        {1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,1,1},
+        {0,0,0,0,1,2,1,2,2,2,2,2,2,2,1,2,1,0,0,0,0},
+        {0,0,0,0,1,2,1,2,1,1,0,1,1,2,1,2,1,0,0,0,0},
+        {1,1,1,1,1,2,1,2,1,0,0,0,1,2,1,2,1,1,1,1,1},
+        {2,2,2,2,2,2,2,2,1,0,0,0,1,2,2,2,2,2,2,2,2},
+        {1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1},
+        {0,0,0,0,1,2,1,2,2,2,2,2,2,2,1,2,1,0,0,0,0},
+        {0,0,0,0,1,2,1,2,1,1,1,1,1,2,1,2,1,0,0,0,0},
+        {1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1},
+        {1,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1},
+        {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
+        {1,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,1},
+        {1,1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1,1},
+        {1,1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1,1},
+        {1,2,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,2,1},
+        {1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1},
+        {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    };
+    for (int y = 0; y < game->grid_height; ++y) {
+        for (int x = 0; x < game->grid_width; ++x) {
+            game->grid[y*game->grid_width + x] = _grid[y][x];
+        }
+    }
+    for (int i = 0; i < array_count(game->entities); ++i) {
+        game->entities[i] = {};
+    }
+    auto set_entity_pos = [](Entity *entity, int pos_x, int pos_y) {
+        entity->pos_x = pos_x;
+        entity->pos_y = pos_y;
+    };
+    auto set_entity_color = [](Entity *entity, f32 r, f32 g, f32 b) {
+        entity->color.r = r;
+        entity->color.g = g;
+        entity->color.b = b;
+    };
+    
+    set_entity_pos(&game->pacman, 10, 20);
+    set_entity_pos(&game->ghost1, 9, 12);
+    set_entity_pos(&game->ghost2, 9, 13);
+    set_entity_pos(&game->ghost3, 11, 12);
+    set_entity_pos(&game->ghost4, 11, 13);
+    
+    set_entity_color(&game->pacman, 1.0f, 1.0f, 0.0f);
+    set_entity_color(&game->ghost1, 1.0f, 0.0f, 0.0f);
+    set_entity_color(&game->ghost2, 0.0f, 1.0f, 0.0f);
+    set_entity_color(&game->ghost3, 0.0f, 1.0f, 1.0f);
+    set_entity_color(&game->ghost4, 1.0f, 0.0f, 1.0f);
+    
+    game->pacman.is_active = true;
+#if 0
+    game->ghost1.is_active = true;
+    set_entity_pos(&game->ghost1, 10, 10);
+#endif
+    
+    game->ghost_activation_frequency_ms = 10000.0f;
+    game->dt_since_last_ghost_activation = 0.0f;
 }
 
 extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
@@ -132,46 +224,11 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         
         game_state->game = push_struct(&game_state->game_arena, Game);
         Game *game = game_state->game;
+        *game = {};
         game->grid = push_array(&game_state->game_arena, (game->grid_height * game->grid_width), u32);
         game->grid_width = 21;
         game->grid_height = 27;
-        u32 _grid[27][21] = {
-            // 0=nothing, 1=wall, 2=walkable, 3=coin, 4=power_coin, 5=player, 6=ghost1, 7=player_start ... ???
-            {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-            {1,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1},
-            {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
-            {1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1},
-            {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
-            {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
-            {1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,2,1},
-            {1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,2,1},
-            {1,2,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,2,1},
-            {1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,1,1},
-            {0,0,0,0,1,2,1,2,2,2,2,2,2,2,1,2,1,0,0,0,0},
-            {0,0,0,0,1,2,1,2,1,1,0,1,1,2,1,2,1,0,0,0,0},
-            {1,1,1,1,1,2,1,2,1,0,0,0,1,2,1,2,1,1,1,1,1},
-            {2,2,2,2,2,2,2,2,1,0,0,0,1,2,2,2,2,2,2,2,2},
-            {1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1},
-            {0,0,0,0,1,2,1,2,2,2,2,2,2,2,1,2,1,0,0,0,0},
-            {0,0,0,0,1,2,1,2,1,1,1,1,1,2,1,2,1,0,0,0,0},
-            {1,1,1,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,1,1,1},
-            {1,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,2,1},
-            {1,2,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,1,2,1},
-            {1,2,2,2,1,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,1},
-            {1,1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1,1},
-            {1,1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1,1},
-            {1,2,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,2,1},
-            {1,2,1,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,2,1},
-            {1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1},
-            {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-        };
-        for (u32 y = 0; y < game->grid_height; ++y) {
-            for (u32 x = 0; x < game->grid_width; ++x) {
-                game->grid[y*game->grid_width + x] = _grid[y][x];
-            }
-        }
-        game->pacman_pos_x = 10;
-        game->pacman_pos_y = 20;
+        reset_game(game);
         
         int tile_size;
         f32 offset_x = 0.0f;
@@ -212,16 +269,16 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         Game_Controller_Input *controller = get_controller(input, game_state->active_controller_index);
         
         if (controller->move_up.ended_down) {
-            game->pacman_next_input_direction = Direction::UP;
+            game->pacman.next_input_direction = Direction::UP;
         }
         else if (controller->move_left.ended_down) {
-            game->pacman_next_input_direction = Direction::LEFT;
+            game->pacman.next_input_direction = Direction::LEFT;
         }
         else if (controller->move_down.ended_down) {
-            game->pacman_next_input_direction = Direction::DOWN;
+            game->pacman.next_input_direction = Direction::DOWN;
         }
         else if (controller->move_right.ended_down) {
-            game->pacman_next_input_direction = Direction::RIGHT;
+            game->pacman.next_input_direction = Direction::RIGHT;
         }
         else if (controller->action_right.ended_down || controller->action_down.ended_down) {
         }
@@ -231,19 +288,115 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     // @note simulate
     //
     
-    game_state->dt_since_last_move_update += (input->dt * 1000.0f);
-    if (game_state->dt_since_last_move_update >= game_state->move_update_frequency_ms) {
+    // @note ghost activation
+    game->dt_since_last_ghost_activation += (input->dt * 1000.0f);
+    if (game->dt_since_last_ghost_activation >= game->ghost_activation_frequency_ms) {
         defer {
-            game_state->dt_since_last_move_update = 0.0f + (game_state->dt_since_last_move_update - game_state->move_update_frequency_ms);
+            game->dt_since_last_ghost_activation = 0.0f + (game->dt_since_last_ghost_activation - game->ghost_activation_frequency_ms);
         };
         
-        b32 moved = move_if_walkable(game, game->pacman_pos_x, game->pacman_pos_y, game->pacman_next_input_direction);
-        if (moved) {
-            game->pacman_move_direction = game->pacman_next_input_direction;
+        for (int i = 1; i < array_count(game->entities); ++i) {
+            Entity *entity = &game->entities[i];
+            if (entity->is_active)  continue;
+            
+            // @todo entity state enum, is_active, activating, not_moving, moving, ... ???
+            entity->is_active = true;
+            entity->pos_x = -1;
+            entity->pos_y = -1;
+            
+            break;
         }
-        else {
-            moved = move_if_walkable(game, game->pacman_pos_x, game->pacman_pos_y, game->pacman_move_direction);
-            if (moved == false)  game->pacman_move_direction = 0;
+    }
+    
+    for (int i = 1; i < array_count(game->entities); ++i) {
+        Entity *entity = &game->entities[i];
+        if (!entity->is_active)  continue;
+        if (entity->pos_x != -1 && entity->pos_y != -1)  continue;
+        
+        if (is_tile_walkable(game, 10, 10)) {
+            entity->pos_x = 10;
+            entity->pos_y = 10;
+        }
+    }
+    
+    // @note update ghost direcitons
+    for (int i = 1; i < array_count(game->entities); ++i) {
+        Entity *entity = &game->entities[i];
+        if (!entity->is_active) continue;
+        
+        int count_walkables = 0;
+        int dir_arr[4];
+        if (is_tile_walkable(game, entity->pos_x, entity->pos_y-1) &&
+            entity->move_direction != Direction::DOWN)  dir_arr[count_walkables++] = Direction::UP;
+        if (is_tile_walkable(game, entity->pos_x, entity->pos_y+1) &&
+            entity->move_direction != Direction::UP)  dir_arr[count_walkables++] = Direction::DOWN;
+        if (is_tile_walkable(game, entity->pos_x+1, entity->pos_y) &&
+            entity->move_direction != Direction::LEFT)  dir_arr[count_walkables++] = Direction::RIGHT;
+        if (is_tile_walkable(game, entity->pos_x-1, entity->pos_y) &&
+            entity->move_direction != Direction::RIGHT)  dir_arr[count_walkables++] = Direction::LEFT;
+        
+        if (count_walkables == 0)  continue;
+        enum32(Direction) dir = dir_arr[0];
+        if (count_walkables > 1) {
+            dir = dir_arr[get_random_number_in_range(0, count_walkables-1)];
+        }
+        
+        entity->next_input_direction = dir;
+    }
+    
+    // @note update entity positions
+    b32 colliding = false;
+    Entity *pacman = &game->entities[0];
+    
+    for (int i = 0; i < array_count(game->entities); ++i) {
+        Entity *entity = &game->entities[i];
+        if (!entity->is_active)  continue;
+        
+        // :collision_detection
+        if (i > 0) {
+            if (pacman->pos_x == entity->pos_x &&
+                pacman->pos_y == entity->pos_y) {
+                colliding = true;
+            }
+        }
+        
+        entity->dt_since_last_move_update += (input->dt * 1000.0f);
+        if (entity->dt_since_last_move_update >= entity->move_update_frequency_ms) {
+            defer {
+                entity->dt_since_last_move_update = 0.0f + (entity->dt_since_last_move_update - entity->move_update_frequency_ms);
+            };
+            
+            b32 moved = move_if_walkable(game, entity, entity->next_input_direction);
+            if (moved) {
+                entity->move_direction = entity->next_input_direction;
+            }
+            else {
+                moved = move_if_walkable(game, entity, entity->move_direction);
+                if (moved == false)  entity->move_direction = 0;
+            }
+        }
+        
+        // :collision_detection
+        if (i > 0) {
+            if (pacman->pos_x == entity->pos_x &&
+                pacman->pos_y == entity->pos_y) {
+                colliding = true;
+            }
+        }
+    }
+    
+    // :collision_detection @note check player ghost collision
+    if (colliding) {
+        if (game->pacman_lifes <= 1) {
+            reset_game(game);
+        }
+        else if (game->pacman_lifes > 1) {
+            --game->pacman_lifes;
+            
+            pacman->pos_x = 10;
+            pacman->pos_y = 20;
+            pacman->move_direction = 0;
+            pacman->next_input_direction = 0;
         }
     }
     
@@ -254,7 +407,11 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     clear_buffer(buffer);
     render_grid(buffer, game_state);
     
-    render_tile(buffer, game_state,
-                game->pacman_pos_x, game->pacman_pos_y,
-                1.0f, 1.0f, 0.0f);
+    for (int i = 0; i < array_count(game->entities); ++i) {
+        Entity *entity = &game->entities[i];
+        
+        render_tile(buffer, game_state,
+                    entity->pos_x, entity->pos_y,
+                    entity->color.r, entity->color.g, entity->color.b);
+    }
 }

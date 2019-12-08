@@ -39,11 +39,27 @@ _push_size_(Memory_Arena *arena, memory_index size) {
 // @note: game related
 //
 
+struct Grid {
+    u32 *tiles;
+    int width;
+    int height;
+};
+
+struct Map {
+    Grid grid;
+    
+    int pacman_start_pos_x;
+    int pacman_start_pos_y;
+    
+    int ghost_start_pos_x;
+    int ghost_start_pos_y;
+};
+
 enum Tile_Type : u32 {
     ZERO = 0,
     WALL = 1,
-    
     WALKABLE = 2,
+    
     COIN = 3,
     POWER_COIN = 4,
     
@@ -60,8 +76,15 @@ enum Direction : u32 {
     LEFT = 4
 };
 
+enum Entity_State : u32 {
+    NOT_ACTIVATED_OR_DEAD = 0,
+    NEED_NEW_POSITION = 1, // @note entity needs new position
+    ACTIVE = 2,
+    POWER_UP = 4,
+};
+
 struct Entity {
-    b32 is_active;
+    enum32(Entity_State) state;
     
     int pos_x;
     int pos_y;
@@ -79,9 +102,7 @@ struct Entity {
 };
 
 struct Game {
-    u32 *grid;
-    int grid_width;
-    int grid_height;
+    Map current_map;
     
     union {
         struct {
@@ -95,6 +116,7 @@ struct Game {
     };
     
     int pacman_lifes = 3;
+    f32 pacman_power_up_duration_left = 0.0f;
     
     f32 ghost_activation_frequency_ms = 10000.0f;
     f32 dt_since_last_ghost_activation = 0.0f;

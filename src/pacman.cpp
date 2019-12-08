@@ -241,6 +241,7 @@ render_coin(Game_Offscreen_Buffer *buffer, Game_State *game_state,
     f32 tile_size = (f32)game_state->tile_size * scale;
     f32 offset_center = ((f32)game_state->tile_size - tile_size) / 2.0f;
     
+#if 0
     Vector2 min = {
         (f32)(game_state->offset_x + x*game_state->tile_size + offset_center),
         (f32)(game_state->offset_y + y*game_state->tile_size + offset_center)
@@ -250,6 +251,32 @@ render_coin(Game_Offscreen_Buffer *buffer, Game_State *game_state,
         min.y + tile_size
     };
     render_rectangle(buffer, min, max, 1.0f, 0.8f, 0.0f);
+#endif
+    u32 color = ((round_float_to_u32(1.0f * 255.0f) << 16) |
+                 (round_float_to_u32(1.0f * 255.0f) << 8)  |
+                 (round_float_to_u32(0.0f * 255.0f) << 0));
+    
+    f32 center_x = (game_state->offset_x + x*game_state->tile_size + (f32)game_state->tile_size/2.0f);
+    f32 center_y = (game_state->offset_y + y*game_state->tile_size + (f32)game_state->tile_size/2.0f);
+    
+    int int_radius = (int)tile_size;
+    for (int r = 0; r <= int_radius; ++r) {
+        f32 current_x = center_x + r;
+        f32 current_y = center_y;
+        for (int angle = 0; angle <= 360; ++angle) {
+            f32 rotated_x = ((current_x - center_x) * (f32)cos(angle)) - ((center_y - current_y) * (f32)sin(angle)) + center_x;
+            f32 rotated_y = ((center_y - current_y) * (f32)cos(angle)) - ((current_x - center_x) * (f32)sin(angle)) + center_y;
+            
+            s32 int_x = round_float_to_s32(rotated_x);
+            s32 int_y = round_float_to_s32(rotated_y);
+            
+            u32 *pixel = (u32 *)((u8 *)buffer->memory +
+                                 int_x * buffer->bytes_per_pixel +
+                                 int_y * buffer->pitch);
+            
+            *pixel = color;
+        }
+    }
 }
 
 internal void
@@ -262,10 +289,10 @@ render_grid(Game_Offscreen_Buffer *buffer, Game_State *game_state) {
                 render_tile(buffer, game_state, x, y, 0.0f, 0.0f, 0.6f);
             }
             else if (tile_value == Tile_Type::COIN) {
-                render_coin(buffer, game_state, x, y, 0.3f);
+                render_coin(buffer, game_state, x, y, 0.1f);
             }
             else if (tile_value == Tile_Type::POWER_COIN) {
-                render_coin(buffer, game_state, x, y, 0.6f);
+                render_coin(buffer, game_state, x, y, 0.4f);
             }
         }
     }

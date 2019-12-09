@@ -1,7 +1,7 @@
 @echo off
 
-IF NOT EXIST ..\build mkdir ..\build
-pushd ..\build
+IF NOT EXIST ..\run_tree mkdir ..\run_tree
+pushd ..\run_tree
 
 ctime -begin .\pacman_build.ctm
 

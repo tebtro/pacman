@@ -1,1 +1,11 @@
 build
+
+*.exe
+*.dll
+*.lib
+*.obj
+
+*.map
+*.pdb
+
+*.exp

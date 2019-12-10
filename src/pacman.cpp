@@ -506,6 +506,7 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         
         // @note load bitmaps
         game_state->bmp_pacman_closed = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/pacman_closed.bmp");
+        game_state->bmp_ghost_red = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_red.bmp");
     }
     Game *game = game_state->game;
     Grid *grid = &game->current_map.grid;
@@ -721,6 +722,11 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         
         if (i == 0) {
             draw_bitmap(buffer, &game_state->bmp_pacman_closed,
+                        (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
+                        (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
+        }
+        else if (i == 1) {
+            draw_bitmap(buffer, &game_state->bmp_ghost_red,
                         (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
                         (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
         }

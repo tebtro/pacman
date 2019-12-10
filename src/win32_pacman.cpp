@@ -16,9 +16,12 @@
 
 #include "win32_pacman.h"
 
+#define TILE_SIZE 32
+#define WIDTH (21  * TILE_SIZE)
+#define HEIGHT (27 * TILE_SIZE)
 
-#define WIDTH  800
-#define HEIGHT 600
+#define WINDOW_WIDTH  (WIDTH) // 800
+#define WINDOW_HEIGHT (HEIGHT) // 600
 
 
 global b32 global_running;
@@ -59,6 +62,35 @@ win32_build_exe_path_filename(Win32_State *state, char *filename,
     concat_strings(state->exe_filename, state->exe_filename_one_past_last_slash - state->exe_filename,
                    filename, string_length(filename),
                    output, output_length);
+}
+
+PLATFORM_FREE_FILE_MEMORY_SIG(platform_free_file_memory) {
+    if (!memory)  return;
+    VirtualFree(memory, null, MEM_RELEASE);
+}
+
+PLATFORM_READ_ENTIRE_FILE_SIG(platform_read_entire_file) {
+    Read_File_Result result = {};
+    
+    HANDLE file_handle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, null, null);
+    defer { CloseHandle(file_handle); };
+    if (file_handle == INVALID_HANDLE_VALUE)  return {};
+    
+    LARGE_INTEGER file_size;
+    if (!GetFileSizeEx(file_handle, &file_size))  return {};
+    result.memory_size = safe_truncate_u64_to_u32(file_size.QuadPart);
+    
+    result.memory = VirtualAlloc(null, result.memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    if (!result.memory)  return {};
+    
+    DWORD bytes_read;
+    if (!ReadFile(file_handle, result.memory, result.memory_size, &bytes_read, null) ||
+        (result.memory_size != bytes_read)) {
+        platform_free_file_memory(result.memory);
+        return {};
+    }
+    
+    return result;
 }
 
 // @note xinput_get_state
@@ -440,7 +472,7 @@ WinMain(HINSTANCE instance,
                                   "Pacman",
                                   WS_OVERLAPPEDWINDOW|WS_VISIBLE,
                                   CW_USEDEFAULT, CW_USEDEFAULT,
-                                  WIDTH, HEIGHT,
+                                  WINDOW_WIDTH, WINDOW_HEIGHT,
                                   0, 0, instance, 0);
     if (!window)  {
         // @todo
@@ -465,6 +497,9 @@ WinMain(HINSTANCE instance,
     LPVOID base_address = 0;
 #endif
     Game_Memory game_memory = {};
+    game_memory.platform_free_file_memory = platform_free_file_memory;
+    game_memory.platform_read_entire_file = platform_read_entire_file;
+    
     game_memory.permanent_storage_size = megabytes_to_bytes(64);
     
     win32_state.game_memory_total_size = game_memory.permanent_storage_size;

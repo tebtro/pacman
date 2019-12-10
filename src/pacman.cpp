@@ -15,6 +15,165 @@ get_random_number_in_range(int min, int max) {
     return random;
 }
 
+// @todo premultiplied alpha
+// @note https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapfileheader
+#pragma pack(push, 1)
+// @note BITMAPINFO structure
+struct Bitmap_Header {
+    // @note BITMAPFILEHEADER structure
+    u16 file_type;
+    u32 file_size;
+    u16 reserved_1;
+    u16 reserved_2;
+    u32 bitmap_offset;
+    
+    // @note BITMAPINFOHEADER structure
+    u32 size;
+    s32 width;
+    s32 height;
+    u16 planes;
+    u16 bit_per_pixel;
+    
+    u32 compression_method;
+    u32 size_of_bitmap;
+    s32 horizontal_resolution;
+    s32 vertical_resolution;
+    u32 colors_used;
+    u32 colors_important;
+    
+    // @note RGBQUAD structure
+    u32 red_mask;
+    u32 green_mask;
+    u32 blue_mask;
+};
+#pragma pack(pop)
+
+internal Loaded_Bitmap
+load_bitmap(Platform_Read_Entire_File_Function *platform_read_entire_file, char *filename) {
+    Loaded_Bitmap result = {};
+    
+    Read_File_Result read_result = platform_read_entire_file(filename);
+    if (read_result.memory_size == 0)  return result;
+    
+    Bitmap_Header *header = (Bitmap_Header *)read_result.memory;
+    // @todo handle compression
+    assert(header->compression_method == 3);
+    // @todo handle top-down or bottom-up order. For top-down the height will be negative.
+    u32 *pixels = (u32 *)((u8 *)read_result.memory + header->bitmap_offset);
+    
+    // 0x AA RR GG BB
+    
+    u32 red_mask   = header->red_mask;
+    u32 green_mask = header->green_mask;
+    u32 blue_mask  = header->blue_mask;
+    u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
+    
+    Bit_Scan_Result red_scan = find_least_significant_set_bit(red_mask);
+    Bit_Scan_Result green_scan = find_least_significant_set_bit(green_mask);
+    Bit_Scan_Result blue_scan = find_least_significant_set_bit(blue_mask);
+    Bit_Scan_Result alpha_scan = find_least_significant_set_bit(alpha_mask);
+    
+    assert(red_scan.found);
+    assert(green_scan.found);
+    assert(blue_scan.found);
+    assert(alpha_scan.found);
+    
+    s32 alpha_shift = 24 - (s32)alpha_scan.index;
+    s32 red_shift   = 16 - (s32)red_scan.index;
+    s32 green_shift =  8 - (s32)green_scan.index;
+    s32 blue_shift  =  0 - (s32)blue_scan.index;
+    
+    u32 *pixel = pixels;
+    for (s32 y = 0; y < header->height; ++y) {
+        for (s32 x = 0; x < header->width; ++x) {
+            u32 color = *pixel;
+#if 1
+            *pixel = (rotate_left(color & alpha_mask, alpha_shift) |
+                      rotate_left(color & red_mask,   red_shift)   |
+                      rotate_left(color & green_mask, green_shift) |
+                      rotate_left(color & blue_mask,  blue_shift));
+#else
+            *pixel = ((((color >> alpha_scan.index) & 0xFF) << 24) |
+                      (((color >> red_scan.index)   & 0xFF) << 16) |
+                      (((color >> green_scan.index) & 0xFF) <<  8) |
+                      (((color >> blue_scan.index)  & 0xFF) <<  0));
+#endif
+            
+            ++pixel;
+        }
+    }
+    
+    result.width  = header->width;
+    result.height = header->height;
+    result.pixels  = pixels;
+    
+    return result;
+}
+
+internal void
+draw_bitmap(Game_Offscreen_Buffer *buffer, Loaded_Bitmap *bitmap,
+            f32 float_x, f32 float_y, s32 align_x = 0, s32 align_y = 0) {
+    float_x -= (f32)align_x;
+    float_y -= (f32)align_y;
+    
+    s32 min_x = round_float_to_s32(float_x);
+    s32 min_y = round_float_to_s32(float_y);
+    s32 max_x = round_float_to_s32(float_x + (f32)bitmap->width);
+    s32 max_y = round_float_to_s32(float_y + (f32)bitmap->height);
+    
+    s32 source_offset_x = 0;
+    if (min_x < 0) {
+        source_offset_x = -min_x;
+        min_x = 0;
+    }
+    s32 source_offset_y = 0;
+    if (min_y < 0) {
+        source_offset_y = -min_y;
+        min_y = 0;
+    }
+    if (max_x > buffer->width)   max_x = buffer->width;
+    if (max_y > buffer->height)  max_y = buffer->height;
+    
+    u32 *source_row = bitmap->pixels + bitmap->width * (bitmap->height - 1);
+    source_row += bitmap->width * -source_offset_y + source_offset_x;
+    u8 *dest_row = ((u8 *)buffer->memory +
+                    min_x * buffer->bytes_per_pixel +
+                    min_y * buffer->pitch);
+    for (s32 y = min_y; y < max_y; ++y) {
+        u32 *source = source_row;
+        u32 *dest = (u32 *)dest_row;
+        
+        for (s32 x = min_x; x < max_x; ++x) {
+            f32 alpha = (f32)((u8)(*source >> 24) & 0xFF) / 255.0f;
+            
+            f32 source_red    = (f32)((u8)(*source >> 16) & 0xFF);
+            f32 source_green  = (f32)((u8)(*source >>  8) & 0xFF);
+            f32 source_blue   = (f32)((u8)(*source >>  0) & 0xFF);
+            
+            f32 dest_alpha = (f32)((u8)(*dest >> 24) & 0xFF);
+            f32 dest_red   = (f32)((u8)(*dest >> 16) & 0xFF);
+            f32 dest_green = (f32)((u8)(*dest >>  8) & 0xFF);
+            f32 dest_blue  = (f32)((u8)(*dest >>  0) & 0xFF);
+            
+            // @note linear blending
+            f32 red   = (1.0f - alpha) * dest_red   + alpha * source_red;
+            f32 green = (1.0f - alpha) * dest_green + alpha * source_green;
+            f32 blue  = (1.0f - alpha) * dest_blue  + alpha * source_blue;
+            
+            *dest = (((u32)(dest_alpha)   << 24) |
+                     ((u32)(red   + 0.5f) << 16) |
+                     ((u32)(green + 0.5f) << 8)  |
+                     ((u32)(blue  + 0.5f) << 0));
+            
+            ++dest;
+            ++source;
+        }
+        
+        source_row -= bitmap->width;
+        dest_row += buffer->pitch;
+    }
+}
+
 internal b32
 is_tile_walkable(Grid *grid, int pos_x, int pos_y) {
     if (pos_x < 0 || pos_y < 0)  return false;
@@ -329,6 +488,7 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
             int tile_width = buffer->width / grid->width;
             int tile_height = buffer->height / grid->height;
             tile_size = (tile_width > tile_height) ? tile_height : tile_width;
+            tile_size = 32;
             
             f32 grid_pixel_width = (f32)(tile_size * grid->width);
             if (grid_pixel_width < (f32)buffer->width) {
@@ -343,6 +503,9 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         game_state->tile_size = tile_size;
         game_state->offset_x = offset_x;
         game_state->offset_y = offset_y;
+        
+        // @note load bitmaps
+        game_state->bmp_pacman_closed = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/pacman_closed.bmp");
     }
     Game *game = game_state->game;
     Grid *grid = &game->current_map.grid;
@@ -556,8 +719,15 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     for (int i = 0; i < array_count(game->entities); ++i) {
         Entity *entity = &game->entities[i];
         
-        render_tile(buffer, game_state,
-                    entity->pos_x, entity->pos_y,
-                    entity->color.r, entity->color.g, entity->color.b);
+        if (i == 0) {
+            draw_bitmap(buffer, &game_state->bmp_pacman_closed,
+                        (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
+                        (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
+        }
+        else {
+            render_tile(buffer, game_state,
+                        entity->pos_x, entity->pos_y,
+                        entity->color.r, entity->color.g, entity->color.b);
+        }
     }
 }

@@ -39,6 +39,11 @@ _push_size_(Memory_Arena *arena, memory_index size) {
 // @note: game related
 //
 
+struct Loaded_Bitmap {
+    s32 width, height;
+    u32 *pixels;
+};
+
 struct Grid {
     u32 *tiles;
     int width;
@@ -131,6 +136,8 @@ struct Game_State {
     f32 offset_y;
     
     u32 active_controller_index;
+    
+    Loaded_Bitmap bmp_pacman_closed;
 };
 
 #define PACMAN_H

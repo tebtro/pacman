@@ -78,6 +78,23 @@ safe_truncate_u64_to_u32(u64 value) {
 }
 
 //
+// @note: services that the platform layer provides to the game.
+//
+
+// @todo Asset loading/streaming
+
+typedef struct Read_File_Result {
+    u32 memory_size;
+    void *memory;
+} Read_File_Result;
+
+#define PLATFORM_FREE_FILE_MEMORY_SIG(name) void name(void *memory)
+typedef PLATFORM_FREE_FILE_MEMORY_SIG(Platform_Free_File_Memory_Function);
+
+#define PLATFORM_READ_ENTIRE_FILE_SIG(name) Read_File_Result name(char *filename)
+typedef PLATFORM_READ_ENTIRE_FILE_SIG(Platform_Read_Entire_File_Function);
+
+//
 // @note: services that the game provides to the platform layer.
 // (this may expand in the future- sound on separate thread, etc.)
 //
@@ -149,6 +166,9 @@ typedef struct Game_Memory {
     
     u64 permanent_storage_size;
     void *permanent_storage; // @note REQUIRED to be cleared to zero at startup
+    
+    Platform_Free_File_Memory_Function *platform_free_file_memory;
+    Platform_Read_Entire_File_Function *platform_read_entire_file;
 } Game_Memory;
 
 

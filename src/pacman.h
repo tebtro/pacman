@@ -104,6 +104,8 @@ struct Entity {
     struct Color {
         f32 r, g, b;
     } color;
+    
+    Loaded_Bitmap bmp;
 };
 
 struct Game {
@@ -112,10 +114,10 @@ struct Game {
     union {
         struct {
             Entity pacman;
-            Entity ghost1;
-            Entity ghost2;
-            Entity ghost3;
-            Entity ghost4;
+            Entity blinky;
+            Entity clyde;
+            Entity inky;
+            Entity pinky;
         };
         Entity entities[5];
     };
@@ -137,8 +139,7 @@ struct Game_State {
     
     u32 active_controller_index;
     
-    Loaded_Bitmap bmp_pacman_closed;
-    Loaded_Bitmap bmp_ghost_red;
+    Loaded_Bitmap bmp_ghost_blue;
 };
 
 #define PACMAN_H

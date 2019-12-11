@@ -1,4 +1,7 @@
+// @todo game_reset also deletes the bitmaps, so they don't get rendered anymore!
+
 // @todo ghost should collide with other ghosts
+// @todo Screen flashes sometimes when in fullscreen ???
 
 #include "pacman.h"
 #include "pacman_math.h"
@@ -287,16 +290,16 @@ reset_game(Game *game) {
     game->current_map.ghost_start_pos_y = 10;
     
     set_entity_pos(&game->pacman, game->current_map.pacman_start_pos_x, game->current_map.pacman_start_pos_y);
-    set_entity_pos(&game->ghost1, 9, 12);
-    set_entity_pos(&game->ghost2, 9, 13);
-    set_entity_pos(&game->ghost3, 11, 12);
-    set_entity_pos(&game->ghost4, 11, 13);
+    set_entity_pos(&game->blinky, 9, 12);
+    set_entity_pos(&game->clyde, 9, 13);
+    set_entity_pos(&game->inky, 11, 12);
+    set_entity_pos(&game->pinky, 11, 13);
     
     set_entity_color(&game->pacman, 1.0f, 1.0f, 0.0f);
-    set_entity_color(&game->ghost1, 1.0f, 0.0f, 0.0f);
-    set_entity_color(&game->ghost2, 0.0f, 1.0f, 0.0f);
-    set_entity_color(&game->ghost3, 0.0f, 1.0f, 1.0f);
-    set_entity_color(&game->ghost4, 1.0f, 0.0f, 1.0f);
+    set_entity_color(&game->blinky, 1.0f, 0.0f, 0.0f);
+    set_entity_color(&game->clyde, 0.0f, 1.0f, 0.0f);
+    set_entity_color(&game->inky, 0.0f, 1.0f, 1.0f);
+    set_entity_color(&game->pinky, 1.0f, 0.0f, 1.0f);
     
     game->pacman.state = Entity_State::ACTIVE;
     
@@ -505,8 +508,12 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         game_state->offset_y = offset_y;
         
         // @note load bitmaps
-        game_state->bmp_pacman_closed = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/pacman_closed.bmp");
-        game_state->bmp_ghost_red = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_red.bmp");
+        game_state->bmp_ghost_blue = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_blue.bmp");
+        game->pacman.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/pacman_closed.bmp");
+        game->blinky.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_blinky.bmp");
+        game->clyde.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_clyde.bmp");
+        game->inky.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_inky.bmp");
+        game->pinky.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_pinky.bmp");
     }
     Game *game = game_state->game;
     Grid *grid = &game->current_map.grid;
@@ -719,21 +726,19 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     
     for (int i = 0; i < array_count(game->entities); ++i) {
         Entity *entity = &game->entities[i];
+        Loaded_Bitmap *bmp = &entity->bmp;
+        if (game->pacman.state == Entity_State::POWER_UP && i != 0) {
+            bmp = &game_state->bmp_ghost_blue;
+        }
         
-        if (i == 0) {
-            draw_bitmap(buffer, &game_state->bmp_pacman_closed,
-                        (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
-                        (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
-        }
-        else if (i == 1) {
-            draw_bitmap(buffer, &game_state->bmp_ghost_red,
-                        (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
-                        (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
-        }
-        else {
-            render_tile(buffer, game_state,
-                        entity->pos_x, entity->pos_y,
-                        entity->color.r, entity->color.g, entity->color.b);
-        }
+        draw_bitmap(buffer, bmp,
+                    (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
+                    (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
+        
+#if 0
+        render_tile(buffer, game_state,
+                    entity->pos_x, entity->pos_y,
+                    entity->color.r, entity->color.g, entity->color.b);
+#endif
     }
 }

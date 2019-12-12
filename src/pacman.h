@@ -140,6 +140,7 @@ struct Game_State {
     u32 active_controller_index;
     
     Loaded_Bitmap bmp_ghost_blue;
+    Loaded_Bitmap bmp_font;
 };
 
 #define PACMAN_H

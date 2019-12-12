@@ -1,7 +1,10 @@
 // @todo game_reset also deletes the bitmaps, so they don't get rendered anymore!
 
+// @todo Load ttf fonts and generate glyph data.
+
 // @todo ghost should collide with other ghosts
 // @todo Screen flashes sometimes when in fullscreen ???
+
 
 #include "pacman.h"
 #include "pacman_math.h"
@@ -174,6 +177,93 @@ draw_bitmap(Game_Offscreen_Buffer *buffer, Loaded_Bitmap *bitmap,
         
         source_row -= bitmap->width;
         dest_row += buffer->pitch;
+    }
+}
+
+// @cleanup @copynpaste
+internal void
+render_char(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, f32 float_y, char _char) {
+    Loaded_Bitmap *bitmap = &game_state->bmp_font;
+    int char_value = _char;
+    int char_index = 0;
+    if (char_value >= 48 && char_value <= 57) {
+        char_index = char_value - 48;
+    }
+    else if (char_value >= 65 && char_value <= 90) {
+        char_index = char_value - 65 + (36);
+    }
+    else if (char_value >= 97 && char_value <= 122) {
+        char_index = char_value - 97 + (10);
+    }
+    
+    
+    s32 min_x = round_float_to_s32(float_x);
+    s32 min_y = round_float_to_s32(float_y);
+    s32 max_x = round_float_to_s32(float_x + (f32)11);
+    s32 max_y = round_float_to_s32(float_y + (f32)17);
+    
+    s32 source_offset_x = 0;
+    if (min_x < 0) {
+        source_offset_x = -min_x;
+        min_x = 0;
+    }
+    s32 source_offset_y = 0;
+    if (min_y < 0) {
+        source_offset_y = -min_y;
+        min_y = 0;
+    }
+    if (max_x > buffer->width)   max_x = buffer->width;
+    if (max_y > buffer->height)  max_y = buffer->height;
+    
+    u32 *source_row = bitmap->pixels + bitmap->width * (bitmap->height - 1);
+    source_row += bitmap->width * -source_offset_y + source_offset_x;
+    source_row += bitmap->width * -0 + 11 * char_index;
+    u8 *dest_row = ((u8 *)buffer->memory +
+                    min_x * buffer->bytes_per_pixel +
+                    min_y * buffer->pitch);
+    for (s32 y = min_y; y < max_y; ++y) {
+        u32 *source = source_row;
+        u32 *dest = (u32 *)dest_row;
+        
+        for (s32 x = min_x; x < max_x; ++x) {
+            f32 alpha = (f32)((u8)(*source >> 24) & 0xFF) / 255.0f;
+            
+            f32 source_red    = (f32)((u8)(*source >> 16) & 0xFF);
+            f32 source_green  = (f32)((u8)(*source >>  8) & 0xFF);
+            f32 source_blue   = (f32)((u8)(*source >>  0) & 0xFF);
+            
+            f32 dest_alpha = (f32)((u8)(*dest >> 24) & 0xFF);
+            f32 dest_red   = (f32)((u8)(*dest >> 16) & 0xFF);
+            f32 dest_green = (f32)((u8)(*dest >>  8) & 0xFF);
+            f32 dest_blue  = (f32)((u8)(*dest >>  0) & 0xFF);
+            
+            // @note linear blending
+            f32 red   = (1.0f - alpha) * dest_red   + alpha * source_red;
+            f32 green = (1.0f - alpha) * dest_green + alpha * source_green;
+            f32 blue  = (1.0f - alpha) * dest_blue  + alpha * source_blue;
+            
+            *dest = (((u32)(dest_alpha)   << 24) |
+                     ((u32)(red   + 0.5f) << 16) |
+                     ((u32)(green + 0.5f) << 8)  |
+                     ((u32)(blue  + 0.5f) << 0));
+            
+            ++dest;
+            ++source;
+        }
+        
+        source_row -= bitmap->width;
+        dest_row += buffer->pitch;
+    }
+}
+
+internal void
+render_string(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, f32 float_y) {
+    // @todo How are we going to handle strings? String library?
+    char *str = "Hello Sailor";
+    int count = 12;
+    
+    for (int i = 0; i < count; ++i) {
+        render_char(buffer, game_state, float_x + (f32)(i * 11), float_y, str[i]);
     }
 }
 
@@ -514,6 +604,8 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         game->clyde.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_clyde.bmp");
         game->inky.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_inky.bmp");
         game->pinky.bmp = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/sprites/ghost_pinky.bmp");
+        
+        game_state->bmp_font = load_bitmap(memory->platform_read_entire_file, "../run_tree/data/fonts/bmp_font.bmp");
     }
     Game *game = game_state->game;
     Grid *grid = &game->current_map.grid;
@@ -741,4 +833,8 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
                     entity->color.r, entity->color.g, entity->color.b);
 #endif
     }
+    
+    // ui
+    
+    render_string(buffer, game_state, 0, 0);
 }

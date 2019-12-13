@@ -21,6 +21,36 @@ get_random_number_in_range(int min, int max) {
     return random;
 }
 
+internal void
+draw_rectangle(Game_Offscreen_Buffer *buffer,
+               Vector2 v_min, Vector2 v_max,
+               f32 r, f32 g, f32 b) {
+    s32 min_x = round_float_to_s32(v_min.x);
+    s32 min_y = round_float_to_s32(v_min.y);
+    s32 max_x = round_float_to_s32(v_max.x);
+    s32 max_y = round_float_to_s32(v_max.y);
+    
+    if (min_x < 0)  min_x = 0;
+    if (min_y < 0)  min_y = 0;
+    if (max_x > buffer->width)   max_x = buffer->width;
+    if (max_y > buffer->height)  max_y = buffer->height;
+    
+    u32 color = ((round_float_to_u32(r * 255.0f) << 16) |
+                 (round_float_to_u32(g * 255.0f) << 8)  |
+                 (round_float_to_u32(b * 255.0f) << 0));
+    
+    u8 *row = ((u8 *)buffer->memory +
+               min_x * buffer->bytes_per_pixel +
+               min_y * buffer->pitch);
+    for (int y = min_y; y < max_y; ++y) {
+        u32 *pixel = (u32 *)row;
+        for (int x = min_x; x < max_x; ++x) {
+            *pixel++ = color;
+        }
+        row += buffer->pitch;
+    }
+}
+
 // @todo premultiplied alpha
 // @note https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapfileheader
 #pragma pack(push, 1)
@@ -186,7 +216,19 @@ render_char(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, 
     Loaded_Bitmap *bitmap = &game_state->bmp_font;
     int char_value = _char;
     int char_index = 0;
-    if (char_value >= 48 && char_value <= 57) {
+    if (char_value == 32) {
+        Vector2 v_min = {
+            float_x,
+            float_y
+        };
+        Vector2 v_max = {
+            v_min.x + 11.0f,
+            v_min.y + 17.0f
+        };
+        draw_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
+        return;
+    }
+    else if (char_value >= 48 && char_value <= 57) {
         char_index = char_value - 48;
     }
     else if (char_value >= 65 && char_value <= 90) {

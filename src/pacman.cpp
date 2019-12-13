@@ -1,5 +1,6 @@
 // @todo game_reset also deletes the bitmaps, so they don't get rendered anymore!
 
+// @todo How are we going to handle strings? String library?
 // @todo Load ttf fonts and generate glyph data.
 
 // @todo ghost should collide with other ghosts
@@ -299,14 +300,77 @@ render_char(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, 
 }
 
 internal void
-render_string(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, f32 float_y) {
-    // @todo How are we going to handle strings? String library?
-    char *str = "Hello Sailor";
-    int count = 12;
-    
-    for (int i = 0; i < count; ++i) {
+render_string(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, f32 float_y, char *str) {
+    for (int i = 0; i < string_length(str); ++i) {
         render_char(buffer, game_state, float_x + (f32)(i * 11), float_y, str[i]);
     }
+}
+
+struct Button {
+    Vector2 v_min;
+    Vector2 v_max;
+};
+
+internal b32
+is_button_pressed(Game_Input *input, Button *button) {
+    b32 is_pressed = false;
+    
+    if (!input->mouse_buttons[0].ended_down)  {
+        return false;
+    }
+    
+    b32 is_inside_x = ((f32)input->mouse_x >= button->v_min.x && (f32)input->mouse_x <= button->v_max.x);
+    b32 is_inside_y = ((f32)input->mouse_y >= button->v_min.y && (f32)input->mouse_y <= button->v_max.y);
+    if (is_inside_x && is_inside_y) {
+        is_pressed = true;
+    }
+    
+    return is_pressed;
+}
+
+// @todo Ability to set width/height of the button
+internal Button
+render_button(Game_Offscreen_Buffer *buffer, Game_Input *input, Game_State *game_state, f32 float_x, f32 float_y, char *str, b32 center = true) {
+    f32 string_width  = (f32)string_length(str) * 11.0f;
+    f32 string_height = 17.0f;
+    f32 padding = 5.0f;
+    
+    Vector2 v_min = {
+        float_x,
+        float_y
+    };
+    if (center) {
+        v_min.x -= (string_width /2.0f) + padding;
+        v_min.y -= (string_height/2.0f) + padding;
+    }
+    Vector2 v_max = {
+        v_min.x + string_width  + 2.0f*padding,
+        v_min.y + string_height + 2.0f*padding
+    };
+    
+    Button button = {
+        v_min,
+        v_max
+    };
+    
+    // @copynpaste @refactor is_inside_rect function or something
+    b32 is_inside_x = ((f32)input->mouse_x >= button.v_min.x && (f32)input->mouse_x <= button.v_max.x);
+    b32 is_inside_y = ((f32)input->mouse_y >= button.v_min.y && (f32)input->mouse_y <= button.v_max.y);
+    if (is_inside_x && is_inside_y) {
+        draw_rectangle(buffer, v_min, v_max, 0.5f, 0.5f, 0.5f);
+        f32 pad = padding - 2.0f;
+        draw_rectangle(buffer,
+                       { v_min.x + pad, v_min.y + pad },
+                       { v_max.x - pad, v_max.y - pad },
+                       1.0f, 1.0f, 1.0f);
+    }
+    else {
+        draw_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
+    }
+    
+    render_string(buffer, game_state, v_min.x + padding, v_min.y + padding, str);
+    
+    return button;
 }
 
 internal b32
@@ -652,10 +716,7 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     Game *game = game_state->game;
     Grid *grid = &game->current_map.grid;
     
-    //
-    // @note do input
-    //
-    
+    // @note get active input controller
     for (u32 controller_index = 0; controller_index < array_count(input->controllers); ++controller_index) {
         Game_Controller_Input *controller = get_controller(input, controller_index);
         if (controller->start.ended_down)  {
@@ -663,6 +724,45 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
         }
     }
     
+    //
+    // @note titlescreen
+    //
+    // @todo Better seperation from the game code? Scene abstraction??? ...
+    if (game_state->show_titlescreen) {
+#if 0
+        Vector2 v_min = {
+            (f32)input->mouse_x,
+            (f32)input->mouse_y
+        };
+        Vector2 v_max = {
+            v_min.x + 10.0f,
+            v_min.y + 10.0f
+        };
+        draw_rectangle(buffer, v_min, v_max, 1.0f, 0.0f, 0.0f);
+#endif
+        
+        // Start game
+        Button button_start_game = render_button(buffer, input, game_state,
+                                                 (f32)buffer->width/2.0f, (f32)buffer->height/2.0f - 21.0f,
+                                                 "Start Game");
+        if (is_button_pressed(input, &button_start_game)) {
+            game_state->show_titlescreen = false;
+        }
+        
+        // Exit game
+        Button button_exit_game = render_button(buffer, input, game_state,
+                                                (f32)buffer->width/2.0f, (f32)buffer->height/2.0f + 21.0f,
+                                                "Exit Game");
+        if (is_button_pressed(input, &button_exit_game)) {
+            input->request_quit = true;
+        }
+        
+        return;
+    }
+    
+    //
+    // @note do input
+    //
     {
         Game_Controller_Input *controller = get_controller(input, game_state->active_controller_index);
         
@@ -878,5 +978,5 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     
     // ui
     
-    render_string(buffer, game_state, 0, 0);
+    render_string(buffer, game_state, 5, 5, "Hello Sailor");
 }

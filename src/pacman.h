@@ -133,6 +133,8 @@ struct Game_State {
     Memory_Arena game_arena;
     Game *game;
     
+    b32 show_titlescreen = true;
+    
     int tile_size;
     f32 offset_x;
     f32 offset_y;

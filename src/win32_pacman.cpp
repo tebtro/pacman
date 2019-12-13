@@ -1,8 +1,11 @@
 // @todo improve input system
 
+// @todo mouse position is still not 100% right, when going further away from the center I think ?
+
 
 #include "iml_general.h"
 #include "pacman_platform.h"
+#include "pacman_math.h"
 #include "iml_types.h"
 
 
@@ -32,29 +35,6 @@ global Win32_Offscreen_Buffer global_backbuffer;
 global s64 global_performance_count_frequency;
 global WINDOWPLACEMENT global_window_position = { sizeof(global_window_position) };
 
-
-internal int
-string_length(char *str) {
-    int length = 0;
-    while (*str++) {
-        ++length;
-    }
-    return length;
-}
-
-internal void
-concat_strings(char *source_a, size_t source_a_length,
-               char *source_b, size_t source_b_length,
-               char *output,   size_t output_length) {
-    // @todo output bounds checking!
-    for (int i = 0; i < source_a_length; ++i) {
-        *output++ = *source_a++;
-    }
-    for (int i = 0; i < source_b_length; ++i) {
-        *output++ = *source_b++;
-    }
-    *output++ = '\0';
-}
 
 internal void
 win32_build_exe_path_filename(Win32_State *state, char *filename,
@@ -201,6 +181,15 @@ internal void
 win32_display_buffer_in_window(Win32_Offscreen_Buffer *buffer, HDC device_context, int window_width, int window_height) {
     // @todo better scaling, centering, black bars, ...
     
+#if 0
+    StretchDIBits(device_context,
+                  0, 0, window_width, window_height,
+                  0, 0, buffer->width, buffer->height,
+                  buffer->memory, &buffer->info,
+                  DIB_RGB_COLORS, SRCCOPY);
+    
+#else
+    
     int buffer_width = WIDTH;
     int buffer_height = HEIGHT;
     
@@ -223,6 +212,7 @@ win32_display_buffer_in_window(Win32_Offscreen_Buffer *buffer, HDC device_contex
                   0, 0, buffer->width, buffer->height,
                   buffer->memory, &buffer->info,
                   DIB_RGB_COLORS, SRCCOPY);
+#endif
 }
 
 internal void
@@ -529,6 +519,11 @@ WinMain(HINSTANCE instance,
     while (global_running) {
         new_input->dt = target_seconds_per_frame;
         
+        Win32_Window_Dimension dimension = win32_get_window_dimension(window);
+        Rectangle_s32 draw_region = aspect_ration_fit(WIDTH,
+                                                      HEIGHT,
+                                                      dimension.width, dimension.height);
+        
         //
         // @note handle input
         //
@@ -547,6 +542,33 @@ WinMain(HINSTANCE instance,
         	continue;
         }
         
+        // @note handle mouse
+        POINT mouse_point;
+        GetCursorPos(&mouse_point);
+        ScreenToClient(window, &mouse_point);
+        f32 mouse_x = (f32)mouse_point.x;
+        f32 mouse_y = (f32)mouse_point.y; // (f32)(dimension.height - 1) - mouse_point.y);
+        
+        new_input->mouse_x = clamp_01_map_to_range((f32)draw_region.min_x, mouse_x, (f32)draw_region.max_x) * WIDTH;
+        new_input->mouse_y = clamp_01_map_to_range((f32)draw_region.min_y, mouse_y, (f32)draw_region.max_y) * HEIGHT;
+        new_input->mouse_z = 0; // @todo Support mousewheel?
+        
+        win32_process_keyboard_message(&new_input->mouse_buttons[0],
+                                       GetKeyState(VK_LBUTTON) & (1 << 15));
+        win32_process_keyboard_message(&new_input->mouse_buttons[1],
+                                       GetKeyState(VK_MBUTTON) & (1 << 15));
+        win32_process_keyboard_message(&new_input->mouse_buttons[2],
+                                       GetKeyState(VK_RBUTTON) & (1 << 15));
+        win32_process_keyboard_message(&new_input->mouse_buttons[3],
+                                       GetKeyState(VK_XBUTTON1) & (1 << 15));
+        win32_process_keyboard_message(&new_input->mouse_buttons[4],
+                                       GetKeyState(VK_XBUTTON2) & (1 << 15));
+        
+        if (new_input->mouse_buttons[0].ended_down) {
+            int break_here = 0;
+        }
+        
+        // @note handle controllers
         DWORD max_controller_count = XUSER_MAX_COUNT;
         DWORD input_controller_count = array_count(input->controllers) - 1;
         if (max_controller_count > input_controller_count) {
@@ -659,7 +681,9 @@ WinMain(HINSTANCE instance,
         buffer.bytes_per_pixel  = global_backbuffer.bytes_per_pixel;
         
         if (game.update_and_render)  game.update_and_render(&game_memory, new_input, &buffer);
-        
+        if (new_input->request_quit) {
+            global_running = false;
+        }
         
         //
         // @note frame rate
@@ -699,7 +723,6 @@ WinMain(HINSTANCE instance,
         // @note display buffer
         //
         
-        Win32_Window_Dimension dimension = win32_get_window_dimension(window);
         HDC device_context = GetDC(window);
         win32_display_buffer_in_window(&global_backbuffer, device_context,
                                        dimension.width, dimension.height);

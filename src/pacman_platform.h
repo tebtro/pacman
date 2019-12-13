@@ -78,6 +78,34 @@ safe_truncate_u64_to_u32(u64 value) {
 }
 
 //
+// @note other stuff
+//
+
+internal int
+string_length(char *str) {
+    int length = 0;
+    while (*str++) {
+        ++length;
+    }
+    return length;
+}
+
+internal void
+concat_strings(char *source_a, size_t source_a_length,
+               char *source_b, size_t source_b_length,
+               char *output,   size_t output_length) {
+    // @todo output bounds checking!
+    for (int i = 0; i < source_a_length; ++i) {
+        *output++ = *source_a++;
+    }
+    for (int i = 0; i < source_b_length; ++i) {
+        *output++ = *source_b++;
+    }
+    *output++ = '\0';
+}
+
+
+//
 // @note: services that the platform layer provides to the game.
 //
 
@@ -150,9 +178,11 @@ typedef struct Game_Input {
     Game_Controller_Input controllers[5];
     
     Game_Button_State mouse_buttons[5];
-    u32 mouse_x, mouse_y, mouse_z;
+    f32 mouse_x, mouse_y, mouse_z;
     
     f32 dt; // @note(tebtro): dt for frame, how long the current frame will take
+    
+    b32 request_quit;
 } Game_Input;
 
 inline Game_Controller_Input *

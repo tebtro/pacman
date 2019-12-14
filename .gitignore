@@ -1,3 +1,14 @@
+# Ignore everything
+*
+
+# Unignore files with an extension
+!*.*
+
+# Unignore directories
+!*/
+
+
+
 build
 
 *.exe
@@ -8,4 +19,5 @@ build
 *.map
 *.pdb
 
+*.out
 *.exp

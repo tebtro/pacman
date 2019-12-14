@@ -1,3 +1,6 @@
+// @todo rename draw to render or the other way.
+// @cleanup there are two render/draw_rectangle functions
+
 // @todo game_reset also deletes the bitmaps, so they don't get rendered anymore!
 
 // @todo How are we going to handle strings? String library?
@@ -5,6 +8,9 @@
 
 // @todo ghost should collide with other ghosts
 // @todo Screen flashes sometimes when in fullscreen ???
+
+// @todo @performance So yeah, I knew render_coin was slow and just bad. But that the frame takes about 50ms instead of under 33ms is just awful.
+// @todo @performance So yeah, I knew render_coin was slow and just bad. But that the frame takes about 50ms instead of under 33ms is just awful.
 
 
 #include "pacman.h"
@@ -23,9 +29,9 @@ get_random_number_in_range(int min, int max) {
 }
 
 internal void
-draw_rectangle(Game_Offscreen_Buffer *buffer,
-               Vector2 v_min, Vector2 v_max,
-               f32 r, f32 g, f32 b) {
+render_rectangle(Game_Offscreen_Buffer *buffer,
+                 Vector2 v_min, Vector2 v_max,
+                 f32 r, f32 g, f32 b) {
     s32 min_x = round_float_to_s32(v_min.x);
     s32 min_y = round_float_to_s32(v_min.y);
     s32 max_x = round_float_to_s32(v_max.x);
@@ -148,8 +154,8 @@ load_bitmap(Platform_Read_Entire_File_Function *platform_read_entire_file, char 
 }
 
 internal void
-draw_bitmap(Game_Offscreen_Buffer *buffer, Loaded_Bitmap *bitmap,
-            f32 float_x, f32 float_y, s32 align_x = 0, s32 align_y = 0) {
+render_bitmap(Game_Offscreen_Buffer *buffer, Loaded_Bitmap *bitmap,
+              f32 float_x, f32 float_y, s32 align_x = 0, s32 align_y = 0) {
     float_x -= (f32)align_x;
     float_y -= (f32)align_y;
     
@@ -226,7 +232,7 @@ render_char(Game_Offscreen_Buffer *buffer, Game_State *game_state, f32 float_x, 
             v_min.x + 11.0f,
             v_min.y + 17.0f
         };
-        draw_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
+        render_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
         return;
     }
     else if (char_value >= 48 && char_value <= 57) {
@@ -357,15 +363,15 @@ render_button(Game_Offscreen_Buffer *buffer, Game_Input *input, Game_State *game
     b32 is_inside_x = ((f32)input->mouse_x >= button.v_min.x && (f32)input->mouse_x <= button.v_max.x);
     b32 is_inside_y = ((f32)input->mouse_y >= button.v_min.y && (f32)input->mouse_y <= button.v_max.y);
     if (is_inside_x && is_inside_y) {
-        draw_rectangle(buffer, v_min, v_max, 0.5f, 0.5f, 0.5f);
+        render_rectangle(buffer, v_min, v_max, 0.5f, 0.5f, 0.5f);
         f32 pad = padding - 2.0f;
-        draw_rectangle(buffer,
-                       { v_min.x + pad, v_min.y + pad },
-                       { v_max.x - pad, v_max.y - pad },
-                       1.0f, 1.0f, 1.0f);
+        render_rectangle(buffer,
+                         { v_min.x + pad, v_min.y + pad },
+                         { v_max.x - pad, v_max.y - pad },
+                         1.0f, 1.0f, 1.0f);
     }
     else {
-        draw_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
+        render_rectangle(buffer, v_min, v_max, 1.0f, 1.0f, 1.0f);
     }
     
     render_string(buffer, game_state, v_min.x + padding, v_min.y + padding, str);
@@ -548,36 +554,6 @@ clear_buffer(Game_Offscreen_Buffer *buffer) {
 }
 
 internal void
-render_rectangle(Game_Offscreen_Buffer *buffer,
-                 Vector2 v_min, Vector2 v_max,
-                 f32 r, f32 g, f32 b) {
-    s32 min_x = round_float_to_s32(v_min.x);
-    s32 min_y = round_float_to_s32(v_min.y);
-    s32 max_x = round_float_to_s32(v_max.x);
-    s32 max_y = round_float_to_s32(v_max.y);
-    
-    if (min_x < 0)  min_x = 0;
-    if (min_y < 0)  min_y = 0;
-    if (max_x > buffer->width)   max_x = buffer->width;
-    if (max_y > buffer->height)  max_y = buffer->height;
-    
-    u32 color = ((round_float_to_u32(r * 255.0f) << 16) |
-                 (round_float_to_u32(g * 255.0f) << 8)  |
-                 (round_float_to_u32(b * 255.0f) << 0));
-    
-    u8 *row = ((u8 *)buffer->memory +
-               min_x * buffer->bytes_per_pixel +
-               min_y * buffer->pitch);
-    for (int y = min_y; y < max_y; ++y) {
-        u32 *pixel = (u32 *)row;
-        for (int x = min_x; x < max_x; ++x) {
-            *pixel++ = color;
-        }
-        row += buffer->pitch;
-    }
-}
-
-internal void
 render_tile(Game_Offscreen_Buffer *buffer, Game_State *game_state,
             u32 x, u32 y,
             f32 r, f32 g, f32 b) {
@@ -628,9 +604,18 @@ render_coin(Game_Offscreen_Buffer *buffer, Game_State *game_state,
             s32 int_x = round_float_to_s32(rotated_x);
             s32 int_y = round_float_to_s32(rotated_y);
             
+            if (int_x < 0)  int_x = 0;
+            if (int_y < 0)  int_y = 0;
+            if (int_x >= buffer->width)   int_x = buffer->width;
+            if (int_y >= buffer->height)  int_y = buffer->height;
+            
             u32 *pixel = (u32 *)((u8 *)buffer->memory +
                                  int_x * buffer->bytes_per_pixel +
                                  int_y * buffer->pitch);
+            
+            if (pixel > ((u32 *)((u8 *)buffer->memory +
+                                 buffer->width * buffer->bytes_per_pixel *
+                                 buffer->height)))  continue;
             
             *pixel = color;
         }
@@ -738,7 +723,7 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
             v_min.x + 10.0f,
             v_min.y + 10.0f
         };
-        draw_rectangle(buffer, v_min, v_max, 1.0f, 0.0f, 0.0f);
+        render_rectangle(buffer, v_min, v_max, 1.0f, 0.0f, 0.0f);
 #endif
         
         // Start game
@@ -965,9 +950,9 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
             bmp = &game_state->bmp_ghost_blue;
         }
         
-        draw_bitmap(buffer, bmp,
-                    (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
-                    (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
+        render_bitmap(buffer, bmp,
+                      (f32)entity->pos_x * game_state->tile_size + game_state->offset_x,
+                      (f32)entity->pos_y * game_state->tile_size + game_state->offset_y);
         
 #if 0
         render_tile(buffer, game_state,

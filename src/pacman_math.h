@@ -20,8 +20,8 @@ struct Rectangle_s32 {
 };
 
 internal Rectangle_s32
-aspect_ration_fit(u32 render_width, u32 render_height,
-                  u32 window_width, u32 window_height) {
+aspect_ratio_fit(u32 render_width, u32 render_height,
+                 u32 window_width, u32 window_height) {
     Rectangle_s32 result = {};
     
     if ((render_width <= 0) || (render_height <= 0) ||

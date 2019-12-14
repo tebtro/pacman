@@ -520,9 +520,9 @@ WinMain(HINSTANCE instance,
         new_input->dt = target_seconds_per_frame;
         
         Win32_Window_Dimension dimension = win32_get_window_dimension(window);
-        Rectangle_s32 draw_region = aspect_ration_fit(WIDTH,
-                                                      HEIGHT,
-                                                      dimension.width, dimension.height);
+        Rectangle_s32 draw_region = aspect_ratio_fit(WIDTH,
+                                                     HEIGHT,
+                                                     dimension.width, dimension.height);
         
         //
         // @note handle input
@@ -563,10 +563,6 @@ WinMain(HINSTANCE instance,
                                        GetKeyState(VK_XBUTTON1) & (1 << 15));
         win32_process_keyboard_message(&new_input->mouse_buttons[4],
                                        GetKeyState(VK_XBUTTON2) & (1 << 15));
-        
-        if (new_input->mouse_buttons[0].ended_down) {
-            int break_here = 0;
-        }
         
         // @note handle controllers
         DWORD max_controller_count = XUSER_MAX_COUNT;

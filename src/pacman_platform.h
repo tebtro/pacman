@@ -46,6 +46,10 @@ BUILD_SLOW:
 
 #if COMPILER_MSVC
 #include <intrin.h>
+#elif COMPILER_LLVM
+#include <x86intrin.h>
+#else
+#error SEE/NEON optimizations are not availables for this compiler yet!!!!
 #endif
 
 //
@@ -188,7 +192,8 @@ typedef struct Game_Input {
 inline Game_Controller_Input *
 get_controller(Game_Input *input, u32 controller_index) {
     assert(controller_index < array_count(input->controllers));
-    return &input->controllers[controller_index];
+    Game_Controller_Input *result = &input->controllers[controller_index];
+    return result;
 }
 
 typedef struct Game_Memory {

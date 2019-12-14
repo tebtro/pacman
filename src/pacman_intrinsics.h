@@ -2,6 +2,7 @@
 
 #include "math.h"
 
+
 inline s32
 round_float_to_s32(f32 value) {
     s32 result = (s32)roundf(value);

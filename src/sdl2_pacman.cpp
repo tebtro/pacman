@@ -42,11 +42,9 @@ PLATFORM_READ_ENTIRE_FILE_SIG(platform_read_entire_file) {
     defer { close(file_handle); };
     
     struct stat file_status;
-    if (fstat(file_handle, &file_status) == -1) {
-        return {};
-    }
-    
+    if (fstat(file_handle, &file_status) == -1)  return {};
     result.memory_size = safe_truncate_u64_to_u32(file_status.st_size);
+    
     result.memory = malloc(result.memory_size);
     if (!result.memory)  return {};
     

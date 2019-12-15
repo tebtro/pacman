@@ -44,10 +44,11 @@ find_least_significant_set_bit(u32 value) {
 #if COMPILER_MSVC
     result.found = _BitScanForward((unsigned long *)&result.index, value);
 #else
-    for (u32 test = 0; test < 32; ++test) {
-        if (value &(1 << test)) {
+    for (s32 test = 0; test < 32; ++test) {
+        if (value & (1 << test)) {
             result.index = test;
             result.found = true;
+            break;
         }
     }
 #endif

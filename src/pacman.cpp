@@ -12,7 +12,6 @@
 // @todo @performance So yeah, I knew render_coin was slow and just bad. But that the frame takes about 50ms instead of under 33ms is just awful.
 // @todo @performance So yeah, I knew render_coin was slow and just bad. But that the frame takes about 50ms instead of under 33ms is just awful.
 
-
 #include "pacman.h"
 #include "pacman_math.h"
 #include "pacman_intrinsics.h"
@@ -632,10 +631,23 @@ render_grid(Game_Offscreen_Buffer *buffer, Game_State *game_state) {
                 render_tile(buffer, game_state, x, y, 0.0f, 0.0f, 0.6f);
             }
             else if (tile_value == Tile_Type::COIN) {
-                render_coin(buffer, game_state, x, y, 0.1f);
+                f32 tile_size = (f32)game_state->tile_size * 0.2f;
+                f32 offset_center = ((f32)game_state->tile_size - tile_size) / 2.0f;
+                Vector2 min = {
+                    (f32)(game_state->offset_x + x*game_state->tile_size + offset_center),
+                    (f32)(game_state->offset_y + y*game_state->tile_size + offset_center)
+                };
+                Vector2 max = {
+                    min.x + tile_size,
+                    min.y + tile_size
+                };
+                render_rectangle(buffer, min, max, 1.0f, 0.8f, 0.0f);
             }
             else if (tile_value == Tile_Type::POWER_COIN) {
-                render_coin(buffer, game_state, x, y, 0.4f);
+                // render_coin(buffer, game_state, x, y, 0.4f);
+                render_bitmap(buffer, &game_state->game->entities[0].bmp,
+                              (f32)x * game_state->tile_size + game_state->offset_x,
+                              (f32)y * game_state->tile_size + game_state->offset_y);
             }
         }
     }

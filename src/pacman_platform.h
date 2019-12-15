@@ -43,7 +43,6 @@ BUILD_SLOW:
 #    endif
 #endif
 
-
 #if COMPILER_MSVC
 #include <intrin.h>
 #elif COMPILER_LLVM
@@ -69,6 +68,8 @@ BUILD_SLOW:
 #else
 #define assert(expression)
 #endif
+
+#define array_count(array) (sizeof(array) / sizeof((array)[0]))
 
 #define kilobytes_to_bytes(value) ((value)*1024LL)
 #define megabytes_to_bytes(value) (kilobytes_to_bytes(value)*1024LL)

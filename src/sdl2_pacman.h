@@ -15,6 +15,25 @@ struct SDL2_Window_Dimension {
     int height;
 };
 
+struct SDL2_Game_Code {
+    void *game_code_dll;
+    
+    // @important Either of the callbacks can be null!
+    // You must check before calling.
+    Game_Update_And_Render_Function *update_and_render;
+    
+    b32 is_valid;
+};
+
+#define SDL2_STATE_FILENAME_LENGTH 255 // @todo
+
+struct SDL2_State {
+    u64 game_memory_total_size;
+    void *game_memory_block;
+    
+    char *executable_path;
+};
+
 
 #define SDL2_PACMAN_H
 #endif

@@ -1,8 +1,9 @@
 #if !defined(PACMAN_H)
 
-#include "iml_general.h"
 
 #include "pacman_platform.h"
+#include "iml_general.h"
+
 
 //
 // @note: memory management

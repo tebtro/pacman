@@ -33,6 +33,9 @@ static_assert(sizeof(size_t) == 8, "Compiling for 32-bit not supported!");
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
+#include <limits.h>
+#include <float.h>
 
 typedef int8_t  s8;
 typedef int16_t s16;

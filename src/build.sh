@@ -6,6 +6,11 @@ pushd ../run_tree
 
 common_compiler_flags="-Wno-write-strings -Wno-unused-variable -Wno-sign-compare -Wno-null-dereference -Wno-missing-braces -fno-rtti -fno-exceptions -Wno-undefined-internal -DBUILD_INTERNAL=1 -DBUILD_SLOW=1 -DBUILD_LINUX=1"
 
+# build game dll
+echo compiling game dll
+clang -shared -fPIC --debug -g $common_compiler_flags -DENV64 ../src/pacman.cpp -lm -MT -link -DLL -o pacman.dll
+
+echo compiling sdl2 platform layer
 # build 64-bit
 clang --debug $common_compiler_flags ../src/sdl2_pacman.cpp -o linux_pacman.x86_64 -g `../libs/sdl2_x64/bin/sdl2-config --cflags --libs` -Wl,-rpath,'$ORIGIN/x86_64' -lm
 

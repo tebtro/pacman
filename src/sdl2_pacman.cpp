@@ -1,8 +1,4 @@
-// @todo compile and load game dll
-// @todo compile and load game dll
-
 // @todo Bitmap argb is wrong?
-// @todo fit_aspect_ratio
 // @todo Support controllers
 
 #include <cstddef>
@@ -10,11 +6,6 @@
 #include "iml_types.h"
 #include "pacman_platform.h"
 #include "pacman_math.h"
-
-#define TESTTEST 1
-#ifdef TESTTEST
-#include "pacman.cpp"
-#endif
 
 #include <SDL.h>
 #include <sys/mman.h>
@@ -72,6 +63,35 @@ PLATFORM_READ_ENTIRE_FILE_SIG(platform_read_entire_file) {
     }
     
     return result;
+}
+
+internal SDL2_Game_Code
+sdl2_load_game_code(char *source_dll_name) {
+    SDL2_Game_Code game = {};
+    
+    game.game_code_dll = SDL_LoadObject(source_dll_name); // dlopen()
+    if (game.game_code_dll) {
+        game.update_and_render = (Game_Update_And_Render_Function *)
+            SDL_LoadFunction(game.game_code_dll, "game_update_and_render"); // dlsym()
+        
+        game.is_valid = (game.update_and_render != nullptr);
+    }
+    
+    if (!game.is_valid) {
+        game.update_and_render = null;
+    }
+    
+    return game;
+}
+
+internal void
+sdl2_unload_game_code(SDL2_Game_Code *game) {
+    if (game->game_code_dll) {
+        SDL_UnloadObject(game->game_code_dll); // dlclose()
+        game->game_code_dll = null;
+    }
+    game->is_valid = false;
+    game->update_and_render = null;
 }
 
 internal SDL2_Window_Dimension
@@ -300,7 +320,30 @@ sdl2_get_seconds_elapsed(u64 start, u64 end) {
     return result;
 }
 
+internal void
+sdl2_get_exe_filename(SDL2_State *state) {
+    char *executable_path = SDL_GetBasePath();
+    state->executable_path = executable_path;
+}
+
+internal void
+sdl2_build_executable_path_filename(SDL2_State *state, char *filename,
+                                    char *output, int output_length) {
+    concat_strings(state->executable_path,
+                   string_length(state->executable_path),
+                   filename, string_length(filename),
+                   output, output_length);
+}
+
 int main(int argc, char *argv[]) {
+    SDL2_State sdl2_state = {};
+    sdl2_get_exe_filename(&sdl2_state);
+    
+    char source_game_dll_full_path[SDL2_STATE_FILENAME_LENGTH];
+    sdl2_build_executable_path_filename(&sdl2_state, "pacman.dll",
+                                        source_game_dll_full_path,
+                                        sizeof(source_game_dll_full_path));
+    
     global_performance_count_frequency = SDL_GetPerformanceFrequency();
     
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)  {
@@ -339,10 +382,17 @@ int main(int argc, char *argv[]) {
     game_memory.platform_read_entire_file = platform_read_entire_file;
     
     game_memory.permanent_storage_size = megabytes_to_bytes(64);
-    game_memory.permanent_storage = mmap(base_address, game_memory.permanent_storage_size,
-                                         PROT_READ | PROT_WRITE,
-                                         MAP_ANON | MAP_PRIVATE,
-                                         -1, 0);
+    sdl2_state.game_memory_total_size = game_memory.permanent_storage_size;
+    sdl2_state.game_memory_block = mmap(base_address, game_memory.permanent_storage_size,
+                                        PROT_READ | PROT_WRITE,
+                                        MAP_ANON | MAP_PRIVATE,
+                                        -1, 0);
+    game_memory.permanent_storage = sdl2_state.game_memory_block;
+    
+    SDL2_Game_Code game = sdl2_load_game_code(source_game_dll_full_path);
+    if (!game.is_valid) {
+        return -1;
+    }
     
     Game_Input input[2] = {};
     Game_Input *new_input = &input[0];
@@ -402,10 +452,7 @@ int main(int argc, char *argv[]) {
         buffer.height = global_backbuffer.height;
         buffer.pitch  = global_backbuffer.pitch;
         buffer.bytes_per_pixel = global_backbuffer.bytes_per_pixel;
-        // @todo if (game.update_and_render)  game.update_and_render(&game_memory, new_input, &buffer);
-#ifdef TESTTEST
-        game_update_and_render(&game_memory, new_input, &buffer);
-#endif
+        if (game.update_and_render)  game.update_and_render(&game_memory, new_input, &buffer);
         if (new_input->request_quit)  {
             global_running = false;
         }

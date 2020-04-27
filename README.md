@@ -1,6 +1,7 @@
 # Pac-Man
 
 [Play online](https://tebtro.github.io/pacman/run_tree/WEB/raylib_playground.html)
+Best in fullscreen mode.
 
 ### Platforms:
 - Windows (x86, x64), using Win32-API

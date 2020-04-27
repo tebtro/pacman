@@ -1,8 +1,11 @@
 # Pac-Man
 
+[Play online](https://tebtro.github.io/pacman/run_tree/WEB/raylib_playground.html)
+
 ### Platforms:
 - Windows (x86, x64), using Win32-API
-- Linux (x86, x64) , using SDL2
+- Linux (x86, x64), using SDL2
+- Web, using Raylib
 
 ### Features:
 - Platform layer

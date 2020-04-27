@@ -20,7 +20,7 @@ namespace iml {
 //
 
 // #include <assert.h>
-#define assert(expression) if (!(expression)) { *(int *)(0) = 0; }
+//#define assert(expression) if (!(expression)) { *(int *)(0) = 0; }
 #define array_count(array) (sizeof(array) / sizeof((array)[0]))
 
 

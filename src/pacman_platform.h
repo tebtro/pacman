@@ -32,8 +32,12 @@ BUILD_SLOW:
 #    define COMPILER_LLVM 0 // clang/llvm
 #endif
 
+#if !defined(COMPILER_WEB)
+#    define COMPILER_WEB 0 // clang/llvm
+#endif
 
-#if !COMPILER_MSVC && !COMPILER_LLVM
+
+#if !COMPILER_MSVC && !COMPILER_LLVM && !COMPILER_WEB
 #    if _MSC_VER
 #        undef COMPILER_MSVC
 #        define COMPILER_MSVC 1
@@ -47,6 +51,8 @@ BUILD_SLOW:
 #include <intrin.h>
 #elif COMPILER_LLVM
 #include <x86intrin.h>
+#elif COMPILER_WEB
+#include <emscripten/emscripten.h>
 #else
 #error SEE/NEON optimizations are not availables for this compiler yet!!!!
 #endif
@@ -60,6 +66,7 @@ BUILD_SLOW:
 // @note macros, ...
 //
 
+#undef assert
 #ifdef assert
 #    undef assert
 #endif

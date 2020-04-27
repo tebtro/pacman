@@ -8,6 +8,10 @@
 !*/
 
 
+!libs/*
+libs/raylib/
+libs/emsdk/
+
 
 build
 

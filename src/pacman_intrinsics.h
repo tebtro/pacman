@@ -21,13 +21,23 @@ round_float_to_u32(f32 value) {
 
 inline u32
 rotate_left(u32 value, s32 amount) {
+#if COMPILER_MSVC
     u32 result = _rotl(value, amount);
+#else
+	amount &= 31;
+	u32 result = ((value << amount) | (value >> (32 - amount)));
+#endif
     return result;
 }
 
 inline u32
 rotate_right(u32 value, s32 amount) {
+#if COMPILER_MSVC
     u32 result = _rotr(value, amount);
+#else
+	amount &= 31;
+	u32 result = ((value >> amount) | (value << (32 - amount)));
+#endif
     return result;
 }
 

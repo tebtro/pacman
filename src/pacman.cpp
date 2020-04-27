@@ -41,9 +41,10 @@ render_rectangle(Game_Offscreen_Buffer *buffer,
     if (max_x > buffer->width)   max_x = buffer->width;
     if (max_y > buffer->height)  max_y = buffer->height;
     
-    u32 color = ((round_float_to_u32(r * 255.0f) << 16) |
-                 (round_float_to_u32(g * 255.0f) << 8)  |
-                 (round_float_to_u32(b * 255.0f) << 0));
+    u32 color = ((0xFF << 24) |
+				 (round_float_to_u32(r * 255.0f) << 16) |
+                 (round_float_to_u32(g * 255.0f) <<  8) |
+                 (round_float_to_u32(b * 255.0f) <<  0));
     
     u8 *row = ((u8 *)buffer->memory +
                min_x * buffer->bytes_per_pixel +
@@ -545,7 +546,7 @@ clear_buffer(Game_Offscreen_Buffer *buffer) {
     for (int y = 0; y < buffer->height; ++y) {
         u32 *pixel = (u32 *)row;
         for (int x = 0; x < buffer->width; ++x) {
-            *pixel++ = 0;
+            *pixel++ = 0xFF000000;
         }
         
         row += buffer->pitch;
@@ -585,7 +586,8 @@ render_coin(Game_Offscreen_Buffer *buffer, Game_State *game_state,
     };
     render_rectangle(buffer, min, max, 1.0f, 0.8f, 0.0f);
 #endif
-    u32 color = ((round_float_to_u32(1.0f * 255.0f) << 16) |
+    u32 color = ((0xFF << 24) |
+	             (round_float_to_u32(1.0f * 255.0f) << 16) |
                  (round_float_to_u32(1.0f * 255.0f) << 8)  |
                  (round_float_to_u32(0.0f * 255.0f) << 0));
     
@@ -628,7 +630,7 @@ render_grid(Game_Offscreen_Buffer *buffer, Game_State *game_state) {
         for (int x = 0; x < grid->width; ++x) {
             int tile_value = grid->tiles[y*grid->width + x];
             if (tile_value == Tile_Type::WALL) {
-                render_tile(buffer, game_state, x, y, 0.0f, 0.0f, 0.6f);
+                render_tile(buffer, game_state, x, y, 0.0f, 0.0f, 1.0f);
             }
             else if (tile_value == Tile_Type::COIN) {
                 f32 tile_size = (f32)game_state->tile_size * 0.2f;
@@ -725,8 +727,10 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     // @note titlescreen
     //
     // @todo Better seperation from the game code? Scene abstraction??? ...
-    if (game_state->show_titlescreen) {
-#if 0
+	if (game_state->show_titlescreen) {
+		clear_buffer(buffer);
+		
+#if 1	
         Vector2 v_min = {
             (f32)input->mouse_x,
             (f32)input->mouse_y
@@ -951,7 +955,6 @@ extern "C" GAME_UPDATE_AND_RENDER_SIG(game_update_and_render) {
     //
     // @note render
     //
-    // render_weird_gradient(buffer, game_state->offset_x, game_state->offset_y);
     clear_buffer(buffer);
     render_grid(buffer, game_state);
     

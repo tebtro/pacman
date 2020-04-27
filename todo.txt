@@ -1,0 +1,1 @@
+- [ ] Fix bug with raylibs color format, blue and green channels are just ignored.
